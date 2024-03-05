@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  customers_db:
+    container_name: customers_db
+    image: mysql:latest
+    environment:
+      MYSQL_HOST: customers_db
+      MYSQL_PORT: 3337
+      MYSQL_ROOT_PASSWORD: SecretPassword2024
+      MYSQL_DATABASE: customers_db
+      MYSQL_USER: costinelnegura2
+      MYSQL_PASSWORD: SecretPassword2024
+    ports:
+      - "3347:3337"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./my.cnf:/etc/mysql/conf.d/my.cnf:ro
+    networks:
+      - workshop_customers_network
+
+  server:
+    build:
+      context: .
+    environment:
+      MYSQL_HOST: customers_db
+      MYSQL_PORT: 3337
+      MYSQL_DATABASE: customers_db
+      MYSQL_USER: costinelnegura2
+      MYSQL_PASSWORD: SecretPassword2024
+      AUTH_VALIDATE_TOKEN_API_URL: http://localhost:8085/api/v1/auth/validate
+    depends_on:
+      - customers_db
+    networks:
+      - workshop_customers_network
+
+  nginx:
+    image: nginx:latest
+    volumes:
+      - ./conf.d:/etc/nginx/conf.d
+    depends_on:
+      - server
+    ports:
+      - "8081:8081"
+    restart: on-failure
+    networks:
+      - workshop_customers_network
+
+networks:
+  workshop_customers_network:
+
+volumes:
+  db_data:

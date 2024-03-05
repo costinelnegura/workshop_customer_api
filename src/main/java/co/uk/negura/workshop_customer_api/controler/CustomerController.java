@@ -13,12 +13,15 @@ import java.util.Map;
 @RequestMapping("/api/v1/customer")
 public class CustomerController {
 
-    @Autowired
-    private CustomerService customerService;
+    private final CustomerService customerService;
+
+    public CustomerController(CustomerService customerService) {
+        this.customerService = customerService;
+    }
 
     /*
-    Create a new customer and save the customer details.
-     */
+        Create a new customer and save the customer details.
+         */
     @PostMapping()
     public ResponseEntity<?> createCustomer(@RequestBody CustomerEntity customer,
                                             @RequestHeader(value="Authorization") String bearerToken){

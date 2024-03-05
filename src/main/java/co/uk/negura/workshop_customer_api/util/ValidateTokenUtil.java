@@ -15,18 +15,6 @@ public class ValidateTokenUtil {
     @Value("${auth.validateTokenApiUrl}")
     private String validateTokenApiUrl;
 
-    /*
-    Old way of creating WebClient, with java 11.
-     */
-//    public ResponseEntity<?> validateToken(String bearerToken) {
-//        WebClient webClient = WebClient.create();
-//        Mono<ResponseEntity<String>> responseEntityMono = webClient.get()
-//                .uri(validateTokenApiUrl)
-//                .header(HttpHeaders.AUTHORIZATION, "Bearer " + bearerToken)
-//                .exchangeToMono(response -> response.toEntity(String.class));
-//        return responseEntityMono.block();
-//    }
-
     public ResponseEntity<?> validateToken(String bearerToken) {
         WebClient webClient = WebClient.builder()
                 .clientConnector(new ReactorClientHttpConnector(HttpClient.create()))

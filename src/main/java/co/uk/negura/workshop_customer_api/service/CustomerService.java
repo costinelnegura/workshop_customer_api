@@ -20,18 +20,24 @@ import java.util.Optional;
 @Service
 public class CustomerService {
 
-    @Autowired
-    private CustomerRepository customerRepository;
 
-    @Autowired
-    ValidateTokenUtil validateTokenUtil;
+    private final CustomerRepository customerRepository;
 
-    @Autowired
-    private HandleResponseUtil handleResponseUtil;
+    private final ValidateTokenUtil validateTokenUtil;
+
+    private final HandleResponseUtil handleResponseUtil;
+
+    public CustomerService(CustomerRepository customerRepository,
+                           ValidateTokenUtil validateTokenUtil,
+                           HandleResponseUtil handleResponseUtil) {
+        this.customerRepository = customerRepository;
+        this.validateTokenUtil = validateTokenUtil;
+        this.handleResponseUtil = handleResponseUtil;
+    }
 
     /*
-    Validate bearer token.
-     */
+        Validate bearer token.
+         */
     private ResponseEntity<?> validateToken(String bearerToken) {
         return validateTokenUtil.validateToken(bearerToken);
     }
