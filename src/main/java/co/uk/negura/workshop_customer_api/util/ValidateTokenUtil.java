@@ -1,13 +1,16 @@
 package co.uk.negura.workshop_customer_api.util;
 
+import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-import reactor.netty.http.client.HttpClient;
+
+import java.net.URI;
+import java.util.List;
 
 @Component
 public class ValidateTokenUtil {
@@ -15,14 +18,31 @@ public class ValidateTokenUtil {
     @Value("${auth.validateTokenApiUrl}")
     private String validateTokenApiUrl;
 
+    private final WebClient.Builder webClientBuilder;
+    private final DiscoveryClient discoveryClient;
+
+    public ValidateTokenUtil(WebClient.Builder webClientBuilder,
+                             DiscoveryClient discoveryClient) {
+        this.webClientBuilder = webClientBuilder;
+        this.discoveryClient = discoveryClient;
+    }
+
+
     public ResponseEntity<?> validateToken(String bearerToken) {
-        WebClient webClient = WebClient.builder()
-                .clientConnector(new ReactorClientHttpConnector(HttpClient.create()))
-                .build();
-        Mono<ResponseEntity<String>> responseEntityMono = webClient.get()
-                .uri(validateTokenApiUrl)
+        List<ServiceInstance> instances = discoveryClient.getInstances("workshop-users-api");
+        if (instances.isEmpty()) {
+            throw new RuntimeException("No instances found for service workshop-users-api");
+        }
+        ServiceInstance instance = instances.getFirst();
+        URI uri = instance.getUri().resolve(validateTokenApiUrl);
+//        URI uri = URI.create("http://localhost:8080/api/v1/auth/validate");
+
+        Mono<ResponseEntity<String>> responseEntityMono = webClientBuilder.build()
+                .get()
+                .uri(uri)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + bearerToken)
-                .exchangeToMono(response -> response.toEntity(String.class));
+                .retrieve()
+                .toEntity(String.class);
         return responseEntityMono.block();
     }
 }

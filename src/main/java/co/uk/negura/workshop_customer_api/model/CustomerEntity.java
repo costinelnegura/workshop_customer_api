@@ -1,7 +1,7 @@
 package co.uk.negura.workshop_customer_api.model;
 
 
-import javax.persistence.*;
+import jakarta.persistence.*;
 
 @Entity
 @Table(name = "customers")

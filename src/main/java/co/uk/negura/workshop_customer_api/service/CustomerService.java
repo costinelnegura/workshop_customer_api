@@ -9,11 +9,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.fge.jsonpatch.JsonPatch;
 import com.github.fge.jsonpatch.JsonPatchException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -66,21 +66,49 @@ public class CustomerService {
         } else if (searchRequest.containsKey("email")) {
             String email = searchRequest.get("email");
             Optional<CustomerEntity> customer = customerRepository.findByEmail(email);
+            if (customer.isEmpty()) {
+                Map<String, Object> body = new HashMap<>();
+                body.put("status", 404);
+                body.put("message", "Customer not found");
+                return ResponseEntity.status(404).header(
+                        "Message", "Customer not found"
+                ).body(body);
+            }
             return handleResponseUtil.handleResponse(customer,
                     tokenValidationResponse,
                     "Customer retrieved successfully",
                     HandleResponseUtil.OperationType.SEARCH);
         } else if (searchRequest.containsKey("id")) {
-            Long id = Long.parseLong(searchRequest.get("id"));
-            Optional<CustomerEntity> customer = customerRepository.findById(id);
-            return handleResponseUtil.handleResponse(customer,
-                    tokenValidationResponse,
-                    "Customer retrieved successfully",
-                    HandleResponseUtil.OperationType.SEARCH);
+            try {
+                Long id = Long.parseLong(searchRequest.get("id"));
+                Optional<CustomerEntity> customer = customerRepository.findById(id);
+                if (customer.isEmpty()) {
+                    Map<String, Object> body = new HashMap<>();
+                    body.put("status", 404);
+                    body.put("message", "Customer not found");
+                    return ResponseEntity.status(404).header(
+                            "Message", "Customer not found"
+                    ).body(body);
+                }
+                return handleResponseUtil.handleResponse(customer,
+                        tokenValidationResponse,
+                        "Customer retrieved successfully",
+                        HandleResponseUtil.OperationType.SEARCH);
+            } catch (NumberFormatException e) {
+                Map<String, Object> body = new HashMap<>();
+                body.put("status", 403);
+                body.put("message", "Invalid Input");
+                return ResponseEntity.status(403).header(
+                        "Message", "Invalid input"
+                ).body(body);
+            }
         } else {
+            Map<String, Object> body = new HashMap<>();
+            body.put("status", 404);
+            body.put("message", "Bad Request");
             return ResponseEntity.status(400).header(
                     "Message", "Bad Request"
-            ).build();
+            ).body(body);
         }
     }
 

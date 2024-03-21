@@ -3,7 +3,6 @@ package co.uk.negura.workshop_customer_api.controler;
 import co.uk.negura.workshop_customer_api.model.CustomerEntity;
 import co.uk.negura.workshop_customer_api.service.CustomerService;
 import com.github.fge.jsonpatch.JsonPatch;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
