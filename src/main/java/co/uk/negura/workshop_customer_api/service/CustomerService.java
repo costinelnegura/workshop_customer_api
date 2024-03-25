@@ -2,20 +2,18 @@ package co.uk.negura.workshop_customer_api.service;
 
 import co.uk.negura.workshop_customer_api.model.CustomerEntity;
 import co.uk.negura.workshop_customer_api.repository.CustomerRepository;
-import co.uk.negura.workshop_customer_api.util.HandleResponseUtil;
-import co.uk.negura.workshop_customer_api.util.ValidateTokenUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.fge.jsonpatch.JsonPatch;
 import com.github.fge.jsonpatch.JsonPatchException;
 import org.springframework.data.crossstore.ChangeSetPersister;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 
 @Service
 public class CustomerService {
@@ -23,125 +21,90 @@ public class CustomerService {
 
     private final CustomerRepository customerRepository;
 
-    private final ValidateTokenUtil validateTokenUtil;
-
-    private final HandleResponseUtil handleResponseUtil;
-
-    public CustomerService(CustomerRepository customerRepository,
-                           ValidateTokenUtil validateTokenUtil,
-                           HandleResponseUtil handleResponseUtil) {
+    public CustomerService(CustomerRepository customerRepository){
         this.customerRepository = customerRepository;
-        this.validateTokenUtil = validateTokenUtil;
-        this.handleResponseUtil = handleResponseUtil;
     }
 
-    /*
-        Validate bearer token.
-         */
-    private ResponseEntity<?> validateToken(String bearerToken) {
-        return validateTokenUtil.validateToken(bearerToken);
-    }
-
-    /*
-    Create a new customer and save the customer details.
+    /**
+     * Create a new customer and save the customer details.
+     * @param customer the customer details to be saved
+     * @return the response entity containing the customer details
      */
-    public ResponseEntity<?> createCustomer(CustomerEntity customer, String bearerToken){
-        ResponseEntity<?> tokenValidationResponse = validateToken(bearerToken);
-        if (tokenValidationResponse.getStatusCode().value() != 200) {
-            return tokenValidationResponse;
-        }
+    public ResponseEntity<?> createCustomer(CustomerEntity customer){
         CustomerEntity newCustomer = customerRepository.save(customer);
-        return handleResponseUtil.handleResponse(Optional.of(newCustomer),
-                tokenValidationResponse, "Customer created successfully",
-                HandleResponseUtil.OperationType.CREATE);
+        return ResponseEntity.status(201).header(
+                "Message", "Customer created successfully"
+        ).body(newCustomer);
     }
 
-    /*
-    Search for a customer using the ID or the email, can be potentially extended to search for customer based on other parameters.
+    /**
+     * Search for a customer using the ID or the email, can be potentially extended to search for customer based on other parameters.
+     * @param searchRequest the search request containing the ID or email of the customer to be searched from the database.
      */
-    public ResponseEntity<?> searchCustomer(Map<String, String> searchRequest, String bearerToken){
-        ResponseEntity<?> tokenValidationResponse = validateToken(bearerToken);
-        if(tokenValidationResponse.getStatusCode().value() != 200){
-            return tokenValidationResponse;
-        } else if (searchRequest.containsKey("email")) {
+    public ResponseEntity<?> searchCustomer(Map<String, String> searchRequest){
+        Map<String, Object> map = new LinkedHashMap<>();
+        if (searchRequest.containsKey("email")) {
             String email = searchRequest.get("email");
-            Optional<CustomerEntity> customer = customerRepository.findByEmail(email);
-            if (customer.isEmpty()) {
-                Map<String, Object> body = new HashMap<>();
-                body.put("status", 404);
-                body.put("message", "Customer not found");
-                return ResponseEntity.status(404).header(
-                        "Message", "Customer not found"
-                ).body(body);
+            CustomerEntity customer = customerRepository.findByEmail(email).orElse(null);
+            if(customer == null){
+                map.put("object", "error");
+                map.put("status", 400);
+                map.put("message", "Customer not found");
+                return ResponseEntity.badRequest().body(map);
             }
-            return handleResponseUtil.handleResponse(customer,
-                    tokenValidationResponse,
-                    "Customer retrieved successfully",
-                    HandleResponseUtil.OperationType.SEARCH);
+            return ResponseEntity.ok().body(customer);
         } else if (searchRequest.containsKey("id")) {
-            try {
-                Long id = Long.parseLong(searchRequest.get("id"));
-                Optional<CustomerEntity> customer = customerRepository.findById(id);
-                if (customer.isEmpty()) {
-                    Map<String, Object> body = new HashMap<>();
-                    body.put("status", 404);
-                    body.put("message", "Customer not found");
-                    return ResponseEntity.status(404).header(
-                            "Message", "Customer not found"
-                    ).body(body);
-                }
-                return handleResponseUtil.handleResponse(customer,
-                        tokenValidationResponse,
-                        "Customer retrieved successfully",
-                        HandleResponseUtil.OperationType.SEARCH);
-            } catch (NumberFormatException e) {
-                Map<String, Object> body = new HashMap<>();
-                body.put("status", 403);
-                body.put("message", "Invalid Input");
-                return ResponseEntity.status(403).header(
-                        "Message", "Invalid input"
-                ).body(body);
+            Long id = Long.parseLong(searchRequest.get("id"));
+            CustomerEntity customer = customerRepository.findById(id).orElse(null);
+            if(customer == null){
+                map.put("object", "error");
+                map.put("status", 400);
+                map.put("message", "Customer not found");
+                return ResponseEntity.badRequest().body(map);
             }
+            return ResponseEntity.ok().body(customer);
         } else {
-            Map<String, Object> body = new HashMap<>();
-            body.put("status", 404);
-            body.put("message", "Bad Request");
-            return ResponseEntity.status(400).header(
-                    "Message", "Bad Request"
-            ).body(body);
+            map.put("object", "error");
+            map.put("status", 400);
+            map.put("message", "Bad Request");
+            return ResponseEntity.badRequest().body(map);
         }
     }
 
-    /*
-    Update customer details by using the ID to find it and update it with the new customer details from the JsonPatch.
+    /**
+     * Update customer details by using the ID to find it and update it with the new customer details from the JsonPatch.
+     * @param ID the ID of the customer to be updated
+     * @param patch the JsonPatch containing the new customer details to be updated
      */
-    public ResponseEntity<?> updateCustomer(Long ID, JsonPatch patch, String bearerToken){
-        ResponseEntity<?> tokenValidationResponse = validateToken(bearerToken);
-           if(tokenValidationResponse.getStatusCode().value() != 200){
-                return tokenValidationResponse;
-            }
+    public ResponseEntity<?> updateCustomer(Long ID, JsonPatch patch){
+        Map<String, Object> map = new LinkedHashMap<>();
         try {
             CustomerEntity user = customerRepository.findById(ID).orElseThrow(ChangeSetPersister.NotFoundException::new);
             CustomerEntity patchedUser = (applyPatchToCustomer(patch, user));
             customerRepository.save(patchedUser);
-            return handleResponseUtil.handleResponse(Optional.of(patchedUser),
-                    tokenValidationResponse,
-                    "Customer updated successfully",
-                    HandleResponseUtil.OperationType.UPDATE);
+            return ResponseEntity.ok().body("Customer updated successfully");
         } catch (ChangeSetPersister.NotFoundException e) {
-            // Handle the case when the user is not found.
-            return ResponseEntity.notFound().build();
+            map.put("object", "error");
+            map.put("status", 404);
+            map.put("message", "Customer not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(map);
         } catch (JsonPatchException | JsonProcessingException e) {
-            // Handle JSON patch or processing exceptions.
-            return ResponseEntity.internalServerError().body("Internal Server Error: JSON Patch Error");
+            map.put("object", "error");
+            map.put("status", 500);
+            map.put("message", "Error updating customer. Please check the JSON Patch");
+            return ResponseEntity.internalServerError().body(map);
         } catch (Exception e) {
-            // Handle any other unexpected exceptions.
-            return ResponseEntity.internalServerError().body("Internal Server Error: Something went wrong");
+            map.put("object", "error");
+            map.put("status", 500);
+            map.put("message", "Internal Server Error: Something went wrong");
+            return ResponseEntity.internalServerError().body(map);
         }
     }
 
-    /*
-    Apply the patch to the customer object.
+    /**
+     * Apply the patch to the customer object.
+     * @param patch the JsonPatch containing the new customer details to be updated
+     * @param targetCustomer the customer object to be updated
      */
     private CustomerEntity applyPatchToCustomer(JsonPatch patch, CustomerEntity targetCustomer)
             throws JsonPatchException, JsonProcessingException {
@@ -149,14 +112,13 @@ public class CustomerService {
         return new ObjectMapper().treeToValue(patched, CustomerEntity.class);
     }
 
-    /*
-    Delete customer details using the ID, can be potentially extended to delete customer based on other parameters.
+    /**
+     * Delete customer details using the ID, can be potentially extended to delete customer based on other parameters.
+     * @param searchRequest the search request containing the ID or email of the customer to be deleted from the database
      */
-    public ResponseEntity<?> deleteCustomer(Map<String, Long> searchRequest, String bearerToken){
-        ResponseEntity<?> tokenValidationResponse = validateToken(bearerToken);
-        if(tokenValidationResponse.getStatusCode().value() != 200){
-            return tokenValidationResponse;
-        } else if (searchRequest.containsKey("id")) {
+    public ResponseEntity<?> deleteCustomer(Map<String, Long> searchRequest){
+        Map<String, Object> map = new LinkedHashMap<>();
+         if (searchRequest.containsKey("id")) {
             Long id = searchRequest.get("id");
             if(customerRepository.existsById(id)){
                 customerRepository.deleteById(id);
@@ -164,14 +126,32 @@ public class CustomerService {
                         "Message", "Customer deleted successfully"
                 ).build();
             } else {
-                return ResponseEntity.status(404).header(
-                        "Message", "Customer not found"
-                ).build();
+                map.put("object", "error");
+                map.put("status", 404);
+                map.put("message", "Customer not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(map);
             }
         } else {
-            return ResponseEntity.status(400).header(
-                    "Message", "Bad Request"
-            ).build();
+            map.put("object", "error");
+            map.put("status", 400);
+            map.put("message", "Bad Request");
+            return ResponseEntity.badRequest().body(map);
+        }
+    }
+
+    /**
+     * Get all customers from the database.
+     * @return List of all customers
+     */
+    public ResponseEntity<?> getAllCustomers() {
+        Map<String, Object> map = new LinkedHashMap<>();
+        if (customerRepository.findAll().isEmpty()) {
+            map.put("object", "error");
+            map.put("status", 404);
+            map.put("message", "No customers found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(map);
+        } else {
+            return ResponseEntity.ok().body(customerRepository.findAll());
         }
     }
 }
